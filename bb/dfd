@@ -1,14 +1,3 @@
-# ---------------------------------------------------------------------------------
-#  /\_/\  🌐 This module was created for Hikka.
-# ( o.o )  🔐 Licensed under the GNU AGPLv3.
-#  > ^ <   ⚠️ Use this module at your own risk.
-# ---------------------------------------------------------------------------------
-# Name: VoiceToText
-# Author: ChatGPT
-# Commands:
-# .voicetotext
-# ---------------------------------------------------------------------------------
-
 import os
 import subprocess
 from telethon import types
