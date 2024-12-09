@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------------
+#  /\_/\  🌐 This module was created for Hikka.
+# ( o.o )  🔐 Licensed under the GNU AGPLv3.
+#  > ^ <   ⚠️ Use this module at your own risk.
+# ---------------------------------------------------------------------------------
+# Name: VoiceToText
+# Author: ChatGPT
+# Commands:
+# .voicetotext
+# ---------------------------------------------------------------------------------
+
+import os
+import subprocess
+from telethon import types
+from .. import loader, utils
+
+class VoiceToTextMod(loader.Module):
+    """Convert voice messages and round videos to text"""
+
+    strings = {"name": "VoiceToText"}
+
+    async def voicetotextcmd(self, message):
+        """Convert voice messages or round videos to text. Usage: .voicetotext (reply to a message)"""
+        reply = await message.get_reply_message()
+        if not reply or not reply.media:
+            await message.edit("<b>Please reply to a voice message or round video.</b>")
+            return
+
+        # Download the media
+        media = reply.media
+        file_path = await self.client.download_media(media, "voice/")
+        if not file_path:
+            await message.edit("<b>Failed to download the file.</b>")
+            return
+
+        await message.edit("<b>Processing...</b>")
+
+        # Convert the file to WAV format
+        wav_path = f"{file_path}.wav"
+        subprocess.run(
+            ["ffmpeg", "-i", file_path, "-ar", "16000", "-ac", "1", wav_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Recognize speech
+        try:
+            import whisper
+            model = whisper.load_model("base")
+            result = model.transcribe(wav_path, language="ru")  # Change language as needed
+            text = result.get("text", "").strip()
+        except Exception as e:
+            await message.edit(f"<b>Error during recognition: {e}</b>")
+            return
+        finally:
+            # Clean up temporary files
+            os.remove(file_path)
+            os.remove(wav_path)
+
+        if text:
+            await message.edit(f"<b>Recognized text:</b>\n{text}")
+        else:
+            await message.edit("<b>Failed to recognize the text.</b>")
