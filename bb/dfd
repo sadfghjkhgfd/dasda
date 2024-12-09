@@ -15,6 +15,11 @@ class VoiceToTextMod(loader.Module):
             await message.edit("<b>Please reply to a voice message or round video.</b>")
             return
 
+        # Check if the media is a voice message or video
+        if not isinstance(reply.media, (types.MessageMediaAudio, types.MessageMediaDocument)):
+            await message.edit("<b>Please reply to a voice message or video.</b>")
+            return
+
         # Download the media
         media = reply.media
         file_path = await self.client.download_media(media, "voice/")
@@ -24,13 +29,24 @@ class VoiceToTextMod(loader.Module):
 
         await message.edit("<b>Processing...</b>")
 
+        # Check if FFmpeg is installed
+        if not self.is_ffmpeg_installed():
+            await message.edit("<b>FFmpeg is not installed. Please install FFmpeg to proceed.</b>")
+            return
+
         # Convert the file to WAV format
         wav_path = f"{file_path}.wav"
-        subprocess.run(
-            ["ffmpeg", "-i", file_path, "-ar", "16000", "-ac", "1", wav_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        try:
+            subprocess.run(
+                ["ffmpeg", "-i", file_path, "-ar", "16000", "-ac", "1", wav_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True  # Ensures an exception is raised if the command fails
+            )
+        except subprocess.CalledProcessError as e:
+            await message.edit(f"<b>FFmpeg conversion failed: {e}</b>")
+            os.remove(file_path)  # Clean up
+            return
 
         # Recognize speech
         try:
@@ -40,13 +56,27 @@ class VoiceToTextMod(loader.Module):
             text = result.get("text", "").strip()
         except Exception as e:
             await message.edit(f"<b>Error during recognition: {e}</b>")
+            os.remove(file_path)  # Clean up
+            os.remove(wav_path)
             return
         finally:
             # Clean up temporary files
-            os.remove(file_path)
-            os.remove(wav_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            if os.path.exists(wav_path):
+                os.remove(wav_path)
 
         if text:
             await message.edit(f"<b>Recognized text:</b>\n{text}")
         else:
             await message.edit("<b>Failed to recognize the text.</b>")
+
+    def is_ffmpeg_installed(self):
+        """Check if ffmpeg is installed"""
+        try:
+            subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            return True
+        except FileNotFoundError:
+            return False
+        except subprocess.CalledProcessError:
+            return False
